@@ -3,11 +3,15 @@
 > **Schema-Driven SQL Normalization & Event Publishing for Python**
 
 [![CircleCI](https://circleci.com/gh/dual/daplug-sql.svg?style=shield)](https://circleci.com/gh/dual/daplug-sql)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=bugs)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=coverage)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![PyPI package](https://img.shields.io/pypi/v/daplug-sql?color=blue&label=pypi%20package)](https://pypi.org/project/daplug-sql/)
 [![License](https://img.shields.io/badge/license-apache%202.0-blue)](LICENSE)
-[![Contributions](https://img.shields.io/badge/contributions-welcome-blue)](https://github.com/dual/daplug-sql/issues)
+[![Contributions](https://img.shields.io/badge/contributions-welcome-blue)](https://github.com/paulcruse3/daplug-sql/issues)
 
-`daplug-sql` gives you the same adapter ergonomics as `daplug-ddb`, but for relational databases. It wraps psycopg2 / mysql-connector with schema-aware CRUD helpers, optimistic updates, and SNS event fan-out so your Postgres and MySQL services stay DRY and event-driven.
+`daplug-sql` wraps psycopg2 / mysql-connector with schema-aware CRUD helpers, optimistic updates, and SNS event fan-out so your Postgres and MySQL services stay DRY and event-driven.
 
 > 📎 **Agents** – a dedicated playbook lives in [`.agents/AGENTS.md`](.agents/AGENTS.md).
 

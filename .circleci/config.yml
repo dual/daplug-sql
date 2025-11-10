@@ -80,22 +80,24 @@ jobs:
                   MYSQL_DATABASE: daplug
                   MYSQL_USER: test
                   MYSQL_PASSWORD: test
-        environment:
-            SQL_POSTGRES_HOST: 127.0.0.1
-            SQL_POSTGRES_PORT: "5432"
-            SQL_POSTGRES_USER: test
-            SQL_POSTGRES_PASSWORD: test
-            SQL_POSTGRES_DB: daplug
-            SQL_MYSQL_HOST: 127.0.0.1
-            SQL_MYSQL_PORT: "3306"
-            SQL_MYSQL_USER: test
-            SQL_MYSQL_PASSWORD: test
-            SQL_MYSQL_DB: daplug
         steps:
             - attach_workspace:
                   at: ~/project
             - setup-artifacts
             - wait-for-databases
+            - run:
+                  name: Export DB host/port for tests
+                  command: |
+                      echo 'export SQL_POSTGRES_HOST=127.0.0.1' >> $BASH_ENV
+                      echo 'export SQL_POSTGRES_PORT=5432' >> $BASH_ENV
+                      echo 'export SQL_POSTGRES_USER=test' >> $BASH_ENV
+                      echo 'export SQL_POSTGRES_PASSWORD=test' >> $BASH_ENV
+                      echo 'export SQL_POSTGRES_DB=daplug' >> $BASH_ENV
+                      echo 'export SQL_MYSQL_HOST=127.0.0.1' >> $BASH_ENV
+                      echo 'export SQL_MYSQL_PORT=3306' >> $BASH_ENV
+                      echo 'export SQL_MYSQL_USER=test' >> $BASH_ENV
+                      echo 'export SQL_MYSQL_PASSWORD=test' >> $BASH_ENV
+                      echo 'export SQL_MYSQL_DB=daplug' >> $BASH_ENV
             - run-tests
             - sonarcloud/scan
     install-build:
