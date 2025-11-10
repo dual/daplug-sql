@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[requires]
+python_version = "3.9.17"
+
+[packages]
+boto3 = "*"
+jsonref = "*"
+simplejson = "*"
+pyyaml = "*"
+
+[dev-packages]
+lxml = "*"
+mypy = "*"
+pylint = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-html = "*"
+
+[scripts]
+lint = "pylint --fail-under 10 daplug_sql"
+test = "pytest tests"
+coverage = "coverage run --source daplug_sql -m pytest tests --cov=daplug_sql --junitxml ./coverage/reports/junit.xml --cov-report xml:./coverage/reports/cov.xml --html=./coverage/reports/index.html --self-contained-html --cov-report html:./coverage/pretty -p no:warnings -o log_cli=true"
+type-check = "mypy daplug_sql"
