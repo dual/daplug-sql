@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-apache%202.0-blue)](LICENSE)
 [![Contributions](https://img.shields.io/badge/contributions-welcome-blue)](https://github.com/paulcruse3/daplug-sql/issues)
 
-`daplug-sql` wraps psycopg2 / mysql-connector with schema-aware CRUD helpers, optimistic updates, and SNS event fan-out so your Postgres and MySQL services stay DRY and event-driven.
+`daplug-sql` wraps psycopg2 / mysql-connector with optimistic CRUD helpers and SNS event fan-out so your Postgres and MySQL services stay DRY and event-driven.
 
 > 📎 **Agents** – a dedicated playbook lives in [`.agents/AGENTS.md`](.agents/AGENTS.md).
 
@@ -20,7 +20,6 @@
 ## ✨ Key Features
 
 - **Single adapter factory** – `daplug_sql.adapter(**kwargs)` returns a ready-to-go adapter configured for Postgres or MySQL based on the `engine` parameter.
-- **Schema mapping** – Reuse OpenAPI / JSON schemas via daplug-core to validate payloads before touching the database.
 - **Optimistic CRUD** – Identifier-aware `insert`, `update`, `upsert`, and `delete` guard against duplicates and emit SNS events automatically.
 - **Connection reuse** – Thread-safe cache reuses connections per endpoint/database/user/port/engine and lazily closes them.
 - **Integration-tested** – `pipenv run integration` spins up both Postgres and MySQL via docker-compose and runs the real test suite.
@@ -219,4 +218,4 @@ Apache License 2.0 – see [LICENSE](LICENSE).
 
 ---
 
-Built to keep SQL integrations schema-aware, event-driven, and zero-boilerplate.
+Built to keep SQL integrations event-driven and zero-boilerplate.

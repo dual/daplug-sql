@@ -6,7 +6,7 @@ This guide shows field agents how to integrate applications with `daplug-sql`. F
 
 ## 1. Instantiate an Adapter
 
-Use the factory function from `daplug_sql` and pass the connection details plus table metadata. Choose the engine (`postgres` or `mysql`) and supply SNS info if you need event publishing.
+Use the factory function from `daplug_sql` and pass the connection details. Choose the engine (`postgres` or `mysql`) and supply SNS info if you need event publishing. Table/identifier names are supplied per method call.
 
 ```python
 from daplug_sql import adapter
@@ -153,7 +153,7 @@ Agents spinning up external databases should export these variables to match the
 1. **Connection errors** – ensure DB ports are reachable and env vars point to the right host/port.
 2. **Identifier errors** – confirm table/column names match `[A-Za-z_][A-Za-z0-9_]*`.
 3. **SNS not firing** – verify `sns_arn`, `sns_endpoint`, or other daplug-core settings passed to `adapter`.
-4. **Schema mapping issues** – ensure payload keys align with the schemas configured in daplug-core (if used).
+4. **Payload shape issues** – ensure each payload includes the identifier column required by the table you pass to the method.
 
 ---
 

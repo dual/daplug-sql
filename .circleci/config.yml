@@ -69,15 +69,16 @@ jobs:
         docker:
             - image: cimg/python:3.9.17
             - image: postgres:15
+              command: -p 55432
               environment:
+                  POSTGRES_DB: daplug
                   POSTGRES_USER: test
                   POSTGRES_PASSWORD: test
-                  POSTGRES_DB: daplug
             - image: mysql:8.0
-              command: --default-authentication-plugin=mysql_native_password --sql-mode=STRICT_TRANS_TABLES
+              command: --default-authentication-plugin=mysql_native_password --sql-mode=STRICT_TRANS_TABLES -p 53306
               environment:
-                  MYSQL_ROOT_PASSWORD: root
                   MYSQL_DATABASE: daplug
+                  MYSQL_ROOT_PASSWORD: root
                   MYSQL_USER: test
                   MYSQL_PASSWORD: test
         steps:
@@ -85,19 +86,6 @@ jobs:
                   at: ~/project
             - setup-artifacts
             - wait-for-databases
-            - run:
-                  name: Export DB host/port for tests
-                  command: |
-                      echo 'export SQL_POSTGRES_HOST=127.0.0.1' >> $BASH_ENV
-                      echo 'export SQL_POSTGRES_PORT=5432' >> $BASH_ENV
-                      echo 'export SQL_POSTGRES_USER=test' >> $BASH_ENV
-                      echo 'export SQL_POSTGRES_PASSWORD=test' >> $BASH_ENV
-                      echo 'export SQL_POSTGRES_DB=daplug' >> $BASH_ENV
-                      echo 'export SQL_MYSQL_HOST=127.0.0.1' >> $BASH_ENV
-                      echo 'export SQL_MYSQL_PORT=3306' >> $BASH_ENV
-                      echo 'export SQL_MYSQL_USER=test' >> $BASH_ENV
-                      echo 'export SQL_MYSQL_PASSWORD=test' >> $BASH_ENV
-                      echo 'export SQL_MYSQL_DB=daplug' >> $BASH_ENV
             - run-tests
             - sonarcloud/scan
     install-build:
