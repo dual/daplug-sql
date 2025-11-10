@@ -1,11 +1,13 @@
+import os
+
 import psycopg2
 
 SETTINGS = {
-    'dbname': 'daplug',
-    'user': 'test',
-    'password': 'test',
-    'host': '127.0.0.1',
-    'port': 55432,
+    'dbname': os.getenv('SQL_POSTGRES_DB', 'daplug'),
+    'user': os.getenv('SQL_POSTGRES_USER', 'test'),
+    'password': os.getenv('SQL_POSTGRES_PASSWORD', 'test'),
+    'host': os.getenv('SQL_POSTGRES_HOST', '127.0.0.1'),
+    'port': int(os.getenv('SQL_POSTGRES_PORT', '55432')),
 }
 
 

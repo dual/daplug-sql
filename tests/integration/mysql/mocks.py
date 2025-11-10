@@ -1,11 +1,13 @@
+import os
+
 import mysql.connector
 
 SETTINGS = {
-    'host': '127.0.0.1',
-    'port': 53306,
-    'user': 'test',
-    'password': 'test',
-    'database': 'daplug',
+    'host': os.getenv('SQL_MYSQL_HOST', '127.0.0.1'),
+    'port': int(os.getenv('SQL_MYSQL_PORT', '53306')),
+    'user': os.getenv('SQL_MYSQL_USER', 'test'),
+    'password': os.getenv('SQL_MYSQL_PASSWORD', 'test'),
+    'database': os.getenv('SQL_MYSQL_DB', 'daplug'),
 }
 
 
