@@ -5,8 +5,10 @@ import pytest
 from daplug_sql.adapter import SQLAdapter
 from tests.integration.postgres import mocks as pg
 
-TABLE_ARGS = {'table': 'items', 'identifier': 'external_id'}
-
+TABLE_ARGS = {
+    'table': 'items', 
+    'identifier': 'external_id'
+}
 
 @pytest.fixture(autouse=True)
 def reset_table():
@@ -29,7 +31,7 @@ def pg_adapter(publish_stub):
         database='daplug',
         user='test',
         password='test',
-        port=55432,
+        port=5432,
         engine='postgres',
     )
     adapter.connect()

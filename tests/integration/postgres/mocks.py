@@ -7,7 +7,7 @@ SETTINGS = {
     'user': os.getenv('SQL_POSTGRES_USER', 'test'),
     'password': os.getenv('SQL_POSTGRES_PASSWORD', 'test'),
     'host': os.getenv('SQL_POSTGRES_HOST', '127.0.0.1'),
-    'port': int(os.getenv('SQL_POSTGRES_PORT', '55432')),
+    'port': int(os.getenv('SQL_POSTGRES_PORT', '5432')),
 }
 
 

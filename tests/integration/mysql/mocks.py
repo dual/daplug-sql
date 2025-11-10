@@ -4,7 +4,7 @@ import mysql.connector
 
 SETTINGS = {
     'host': os.getenv('SQL_MYSQL_HOST', '127.0.0.1'),
-    'port': int(os.getenv('SQL_MYSQL_PORT', '53306')),
+    'port': int(os.getenv('SQL_MYSQL_PORT', '3306')),
     'user': os.getenv('SQL_MYSQL_USER', 'test'),
     'password': os.getenv('SQL_MYSQL_PASSWORD', 'test'),
     'database': os.getenv('SQL_MYSQL_DB', 'daplug'),
