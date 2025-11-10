@@ -29,7 +29,7 @@ def mysql_adapter(publish_stub):
         database='daplug',
         user='test',
         password='test',
-        port=53306,
+        port=3306,
         engine='mysql',
     )
     adapter.connect()
@@ -62,7 +62,7 @@ def test_connect_with_invalid_credentials():
         database='daplug',
         user='test',
         password='wrong',
-        port=53306,
+        port=3306,
         engine='mysql',
     )
     with pytest.raises(Exception):
