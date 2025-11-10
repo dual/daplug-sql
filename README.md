@@ -73,7 +73,9 @@ sql.close()
 | `password`           | `str`   | ✅       | Database password.                                                          |
 | `engine`             | `str`   | ➖       | `'postgres'` (default) or `'mysql'`.                                        |
 | `autocommit`         | `bool`  | ➖       | Defaults to `True`; set `False` for manual transaction control.             |
-| `sns_*` kwargs       | Mixed   | ➖       | Standard daplug-core SNS configuration (ARN, endpoint, fifo options, etc.). |
+| `sns_arn`            | `str`   | ➖       | SNS topic ARN used when publishing CRUD events.                              |
+| `sns_endpoint`       | `str`   | ➖       | Optional SNS endpoint URL (e.g., LocalStack).                               |
+| `sns_attributes`     | `dict`  | ➖       | Default SNS message attributes merged into every publish.                    |
 
 ### Per-Call Options
 
@@ -85,6 +87,43 @@ Every CRUD/query helper expects the target table and identifier column at call t
 | `identifier`   | Column that uniquely identifies rows (`customer_id`).   |
 | `commit`       | Override `autocommit` per call (`True`/`False`).        |
 | `debug`        | Log SQL statements via the adapter logger when `True`.  |
+| `sns_attributes` | Per-call attributes merged with defaults before publish. |
+| `fifo_group_id` / `fifo_duplication_id` | Optional FIFO metadata passed straight to SNS. |
+
+### SNS Publishing
+
+`SQLAdapter` inherits daplug-core's SNS publisher. Provide the topic details when constructing the adapter:
+
+```python
+sql = adapter(
+    endpoint="127.0.0.1",
+    database="daplug",
+    user="svc",
+    password="secret",
+    engine="postgres",
+    sns_arn="arn:aws:sns:us-east-1:123456789012:sql-events",
+    sns_endpoint="http://localhost:4566",  # optional (LocalStack)
+    sns_attributes={"service": "billing"},
+)
+```
+
+- `sns_attributes` passed to `adapter(...)` become defaults for every publish.
+- Each CRUD helper accepts its own `sns_attributes` to overlay call-specific metadata.
+- FIFO topics are supported via the `fifo_group_id` and `fifo_duplication_id` kwargs on individual calls.
+
+Example:
+
+```python
+sql.insert(
+    data={"customer_id": "abc123", "name": "Ada"},
+    table="customers",
+    identifier="customer_id",
+    sns_attributes={"event": "customer-created"},
+    fifo_group_id="customers",
+)
+```
+
+If `sns_arn` is omitted, publish calls are skipped automatically.
 
 ---
 

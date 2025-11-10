@@ -26,6 +26,9 @@ sql = adapter(
 | `database`       | Database/schema name                            |
 | `user`/`password`| Authentication credentials                      |
 | `engine`         | `'postgres'` (default) or `'mysql'`             |
+| `sns_arn`        | SNS topic ARN for CRUD event fan-out            |
+| `sns_endpoint`   | Optional SNS endpoint URL (LocalStack)          |
+| `sns_attributes` | Default SNS attributes merged into every event  |
 
 Always pass `table` and `identifier` to each CRUD/query call so a single adapter can target any table without reopening connections.
 
@@ -131,6 +134,22 @@ try:
     sql.commit(True)
 finally:
     sql.close()
+
+### SNS Events
+
+- Pass `sns_arn` (and optionally `sns_endpoint`, `sns_attributes`) when constructing the adapter.
+- Per call, supply `sns_attributes`, `fifo_group_id`, or `fifo_duplication_id` to annotate messages.
+
+```python
+sql = adapter(..., sns_arn="arn:aws:sns:us-east-1:123456789012:sql-events")
+sql.insert(
+    data=payload,
+    table="customers",
+    identifier="customer_id",
+    sns_attributes={"event": "customer-created"},
+    fifo_group_id="customers",
+)
+```
 ```
 
 ---
