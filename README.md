@@ -44,16 +44,16 @@ sql = adapter(
     database="daplug",
     user="svc",
     password="secret",
-    table="customers",
-    identifier="customer_id",
     engine="postgres",  # "mysql" also supported
-    schema_file="openapi.yml",
-    model_schema="CustomerModel",
 )
 
 sql.connect()
-sql.insert(data={"customer_id": "abc123", "name": "Ada"})
-record = sql.get("abc123")
+sql.insert(
+    data={"customer_id": "abc123", "name": "Ada"},
+    table="customers",
+    identifier="customer_id",
+)
+record = sql.get("abc123", table="customers", identifier="customer_id")
 print(record)
 sql.close()
 ```
@@ -68,13 +68,20 @@ sql.close()
 | `database`           | `str`   | ✅       | Database/schema name.                                                       |
 | `user`               | `str`   | ✅       | Database username.                                                          |
 | `password`           | `str`   | ✅       | Database password.                                                          |
-| `table`              | `str`   | ✅       | Default table name for CRUD helpers.                                        |
-| `identifier`         | `str`   | ✅       | Column used to uniquely identify rows.                                      |
 | `engine`             | `str`   | ➖       | `'postgres'` (default) or `'mysql'`.                                        |
 | `autocommit`         | `bool`  | ➖       | Defaults to `True`; set `False` for manual transaction control.             |
-| `model_schema`       | `str`   | ➖       | Key inside `model_schema_file` used for mapping writes.                     |
-| `model_schema_file`  | `str`   | ➖       | Path to your OpenAPI/JSON schema file.                                      |
 | `sns_*` kwargs       | Mixed   | ➖       | Standard daplug-core SNS configuration (ARN, endpoint, fifo options, etc.). |
+
+### Per-Call Options
+
+Every CRUD/query helper expects the target table and identifier column at call time so one adapter can manage multiple tables:
+
+| Argument       | Description                                            |
+|----------------|--------------------------------------------------------|
+| `table`        | Table to operate on (`customers`, `orders`, etc.).      |
+| `identifier`   | Column that uniquely identifies rows (`customer_id`).   |
+| `commit`       | Override `autocommit` per call (`True`/`False`).        |
+| `debug`        | Log SQL statements via the adapter logger when `True`.  |
 
 ---
 
@@ -82,18 +89,17 @@ sql.close()
 
 | Method                     | Description                                                                                                   |
 |----------------------------|---------------------------------------------------------------------------------------------------------------|
-| `connect()`                | Opens a connection + cursor using the engine-specific connector.                                              |
-| `close()`                  | Closes the cursor/connection and evicts the cached connector.                                                  |
-| `commit(commit=True)`      | Commits the underlying DB connection when `commit` is truthy.                                                 |
-| `create(**kwargs)`         | Alias of `insert`.                                                                                             |
-| `insert(data, **kwargs)`   | Validates schema, enforces uniqueness on the identifier, inserts the row, and publishes SNS.                  |
-| `update(data, **kwargs)`   | Fetches the existing row, merges the payload via `dict_merger`, runs `UPDATE`, publishes SNS.                  |
-| `upsert(**kwargs)`         | Calls `update` when the row exists; falls back to `insert`.                                                   |
-| `get(identifier_value, **kwargs)` | Returns the first matching row or `None`.                                                          |
-| `read(identifier_value, **kwargs)`| Alias of `get` for parity with other daplug adapters.                                                   |
-| `query(query, params, **kwargs)`  | Executes a read-only statement (SELECT) and returns all rows as dictionaries.                            |
-| `delete(identifier_value, **kwargs)` | Deletes the row, publishes SNS, and ignores missing rows.                                        |
-| `create_index(table_name, index_columns)` | Issues `CREATE INDEX index_col1_col2 ON table_name (col1, col2)` using safe identifiers. |
+| `connect()`                                         | Opens a connection + cursor using the engine-specific connector.                                   |
+| `close()`                                           | Closes the cursor/connection and evicts the cached connector.                                       |
+| `commit(commit=True)`                               | Commits the underlying DB connection when `commit` is truthy.                                      |
+| `insert(data, table, identifier, **kwargs)`         | Validates data, enforces uniqueness on the provided identifier, inserts the row, and publishes SNS. |
+| `update(data, table, identifier, **kwargs)`         | Fetches the existing row, merges via `dict_merger`, runs `UPDATE`, publishes SNS.                   |
+| `upsert(data, table, identifier, **kwargs)`         | Calls `update` when the row exists; falls back to `insert`.                                        |
+| `get(identifier_value, table, identifier, **kwargs)`| Returns the first matching row or `None`.                                                         |
+| `read(identifier_value, table, identifier, **kwargs)`| Alias of `get`.                                                                                   |
+| `query(query, params, table, identifier, **kwargs)` | Executes a read-only statement (SELECT) and returns all rows as dictionaries.                       |
+| `delete(identifier_value, table, identifier, **kwargs)` | Deletes the row, publishes SNS, and ignores missing rows.                                     |
+| `create_index(table_name, index_columns)`           | Issues `CREATE INDEX index_col1_col2 ON table_name (col1, col2)` using safe identifiers.            |
 
 > All identifier-based helpers sanitize names with `SAFE_IDENTIFIER` to prevent SQL injection through table/column inputs.
 
@@ -109,16 +115,16 @@ sql = adapter(
     database="daplug",
     user="svc",
     password="secret",
-    table="inventory",
-    identifier="sku",
     engine="postgres",
 )
 sql.connect()
 
-sql.insert(data={"sku": "W-1000", "name": "Widget", "cost": 99})
+sql.insert(data={"sku": "W-1000", "name": "Widget", "cost": 99}, table="inventory", identifier="sku")
 rows = sql.query(
     query="SELECT sku, name FROM inventory WHERE cost >= %(min_cost)s",
     params={"min_cost": 50},
+    table="inventory",
+    identifier="sku",
 )
 print(rows)
 sql.close()
@@ -132,16 +138,14 @@ sql = adapter(
     database="daplug",
     user="svc",
     password="secret",
-    table="orders",
-    identifier="order_id",
     engine="mysql",
     autocommit=False,
 )
 sql.connect()
 
 try:
-    sql.insert(data={"order_id": "O-1", "status": "pending"}, commit=False)
-    sql.update(data={"order_id": "O-1", "status": "shipped"}, commit=False)
+    sql.insert(data={"order_id": "O-1", "status": "pending"}, table="orders", identifier="order_id", commit=False)
+    sql.update(data={"order_id": "O-1", "status": "shipped"}, table="orders", identifier="order_id", commit=False)
     sql.commit(True)
 finally:
     sql.close()
