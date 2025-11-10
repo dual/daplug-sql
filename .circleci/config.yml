@@ -32,9 +32,22 @@ commands:
             - run: pipenv run pylint-json2html ./coverage/lint/pylint_report.json -o ./coverage/lint/pylint_report.html || exit 0
             - store_artifacts:
                   path: ./coverage/lint
-    run-mypy:
+    run-type-check:
         steps:
             - run: pipenv run type-check
+    wait-for-databases:
+        steps:
+            - run:
+                  name: Wait for database containers
+                  command: |
+                      for port in 5432 3306; do
+                        for i in $(seq 1 30); do
+                          if (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
+                            break
+                          fi
+                          sleep 2
+                        done
+                      done
 jobs:
     lint:
         docker:
@@ -51,14 +64,27 @@ jobs:
             - attach_workspace:
                   at: ~/project
             - setup-artifacts
-            - run-mypy
+            - run-type-check
     test:
         docker:
             - image: cimg/python:3.9.17
+            - image: postgres:15
+              environment:
+                  POSTGRES_USER: test
+                  POSTGRES_PASSWORD: test
+                  POSTGRES_DB: daplug
+            - image: mysql:8.0
+              command: --default-authentication-plugin=mysql_native_password --sql-mode=STRICT_TRANS_TABLES
+              environment:
+                  MYSQL_ROOT_PASSWORD: root
+                  MYSQL_DATABASE: daplug
+                  MYSQL_USER: test
+                  MYSQL_PASSWORD: test
         steps:
             - attach_workspace:
                   at: ~/project
             - setup-artifacts
+            - wait-for-databases
             - run-tests
             - sonarcloud/scan
     install-build:
