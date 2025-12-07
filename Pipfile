@@ -4,11 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [requires]
-python_version = "3.9.17"
+python_version = "3.10.14"
 
 [packages]
 boto3 = "*"
-daplug_core = "*"
+daplug-core = "*"
 psycopg2-binary = "*"
 mysql-connector-python = "*"
 
@@ -27,3 +27,4 @@ test = "pytest tests/unit"
 test_ci = "bash -c 'pytest tests/unit && pytest tests/integration'"
 coverage = "coverage run --source daplug_sql -m pytest tests --cov=daplug_sql --junitxml ./coverage/reports/junit.xml --cov-report xml:./coverage/reports/cov.xml --html=./coverage/reports/index.html --self-contained-html --cov-report html:./coverage/pretty -p no:warnings -o log_cli=true"
 type-check = "mypy daplug_sql"
+setup-sync = "python tools/sync_setup_requires.py"

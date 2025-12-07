@@ -6,7 +6,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=bugs)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=dual_daplug-sql&metric=coverage)](https://sonarcloud.io/summary/new_code?id=dual_daplug-sql)
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![PyPI package](https://img.shields.io/pypi/v/daplug-sql?color=blue&label=pypi%20package)](https://pypi.org/project/daplug-sql/)
 [![License](https://img.shields.io/badge/license-apache%202.0-blue)](LICENSE)
 [![Contributions](https://img.shields.io/badge/contributions-welcome-blue)](https://github.com/paulcruse3/daplug-sql/issues)

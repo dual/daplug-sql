@@ -48,10 +48,13 @@ commands:
                           sleep 2
                         done
                       done
+    sync-packaging:
+        steps:
+            - run: pipenv run setup-sync
 jobs:
     lint:
         docker:
-            - image: cimg/python:3.9.17
+            - image: cimg/python:3.10.14
         steps:
             - attach_workspace:
                   at: ~/project
@@ -59,7 +62,7 @@ jobs:
             - run-lint
     typing:
         docker:
-            - image: cimg/python:3.9.17
+            - image: cimg/python:3.10.14
         steps:
             - attach_workspace:
                   at: ~/project
@@ -67,7 +70,7 @@ jobs:
             - run-type-check
     test:
         docker:
-            - image: cimg/python:3.9.17
+            - image: cimg/python:3.10.14
             - image: postgres:15
               command: -p 5432
               environment:
@@ -90,7 +93,7 @@ jobs:
             - sonarcloud/scan
     install-build:
         docker:
-            - image: cimg/python:3.9.17
+            - image: cimg/python:3.10.14
         steps:
             - checkout:
                   method: full
@@ -103,12 +106,13 @@ jobs:
                       - ./*
     install-build-publish:
         docker:
-            - image: cimg/python:3.9.17
+            - image: cimg/python:3.10.14
         steps:
             - checkout:
                   method: full
             - python/install-packages:
                   pkg-manager: pipenv
+            - sync-packaging
             - pypi-setup
             - pypi-publish
 workflows:
