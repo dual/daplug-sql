@@ -73,6 +73,21 @@ def test_insert_executes_and_publishes(adapter, publish_mock, monkeypatch):
     publish_mock.assert_called_once_with({'id': 1}, table='items', identifier='id', data={'id': 1})
 
 
+def test_insert_forwards_publish_false_kwarg(adapter, publish_mock, monkeypatch):
+    monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: False)
+    monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_data_params', lambda self, **_: ({'id': 1}, ['id'], (1,)))
+    adapter.insert(table='items', identifier='id', data={'id': 1}, publish=False)
+    assert publish_mock.call_args.kwargs.get('publish') is False
+
+
+def test_insert_forwards_publish_data_kwarg(adapter, publish_mock, monkeypatch):
+    monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: False)
+    monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_data_params', lambda self, **_: ({'id': 1}, ['id'], (1,)))
+    override = {'event': 'custom-shape'}
+    adapter.insert(table='items', identifier='id', data={'id': 1}, publish_data=override)
+    assert publish_mock.call_args.kwargs.get('publish_data') == override
+
+
 def test_insert_raises_on_duplicate(adapter, monkeypatch):
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: {'id': 1})
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_data_params', lambda self, **_: ({'id': 1}, ['id'], (1,)))

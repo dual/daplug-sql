@@ -23,7 +23,7 @@ setup(
     python_requires=">=3.10",
     install_requires=[
         "boto3>=1.42.4,<2; python_version >= '3.9'",
-        "daplug-core>=1.0.0b5,<2; python_version >= '3.9'",
+        "daplug-core>=1.0.0b7,<2; python_version >= '3.9'",
         "psycopg2-binary>=2.9.11,<3; python_version >= '3.9'",
         "mysql-connector-python>=9.5.0,<10; python_version >= '3.10'",
     ],

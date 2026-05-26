@@ -89,6 +89,8 @@ Every CRUD/query helper expects the target table and identifier column at call t
 | `debug`        | Log SQL statements via the adapter logger when `True`.  |
 | `sns_attributes` | Per-call attributes merged with defaults before publish. |
 | `fifo_group_id` / `fifo_duplication_id` | Optional FIFO metadata passed straight to SNS. |
+| `publish` | Set to `False` to skip the SNS publish for this call only (default `True`). |
+| `publish_data` | Replace the published payload entirely (the row write is unchanged). |
 
 ### SNS Publishing
 
@@ -123,7 +125,21 @@ sql.insert(
 )
 ```
 
-If `sns_arn` is omitted, publish calls are skipped automatically.
+If `sns_arn` is omitted, publish calls are skipped automatically. To skip
+a single call while keeping defaults intact, pass `publish=False`. To
+publish a different payload than the row that was written, pass
+`publish_data={...}`.
+
+```python
+sql.insert(data=row, table="customers", identifier="customer_id", publish=False)
+
+sql.update(
+    data=row,
+    table="customers",
+    identifier="customer_id",
+    publish_data={"id": row["customer_id"], "event": "updated"},
+)
+```
 
 ---
 
