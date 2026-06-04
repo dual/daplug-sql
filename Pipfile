@@ -8,7 +8,7 @@ python_version = "3.10.14"
 
 [packages]
 boto3 = "*"
-daplug-core = ">=1.0.0b7,<2"
+daplug-core = "==1.0.0b8"
 psycopg2-binary = "*"
 mysql-connector-python = "*"
 
