@@ -8,10 +8,10 @@ from daplug_core.base_adapter import BaseAdapter  # type: ignore[import-untyped]
 from daplug_core.logger import logger  # type: ignore[import-untyped]
 
 from .exception import CreateTableException, SQLAdapterException
-from .params import adapt_sequence
+from .param_adapter import ParamAdapter
 from .sql_connection import sql_connection, sql_connection_cleanup
 from .types import ConnectionProtocol, CursorProtocol, JSONDict
-from .upsert_builder import POSTGRES_JSON_MERGE_FUNCTION, UpsertBuilder
+from .upsert_builder import UpsertBuilder
 
 if TYPE_CHECKING:
     from .sql_connector import SQLConnector
@@ -117,7 +117,7 @@ class SQLAdapter(BaseAdapter):
     def install_json_merge(self, **kwargs: Any) -> None:
         if self.engine == 'mysql':
             return
-        self.__execute(POSTGRES_JSON_MERGE_FUNCTION, None, **kwargs)
+        self.__execute(UpsertBuilder.POSTGRES_JSON_MERGE_FUNCTION, None, **kwargs)
 
     def delete(self, identifier_value: Any, **kwargs: Any) -> None:
         table = self.__format_identifier(kwargs['table'])
@@ -164,7 +164,7 @@ class SQLAdapter(BaseAdapter):
             formatted_column = self.__format_identifier(column)
             set_clause_parts.append(f'{formatted_column} = %s')
         set_clause = ', '.join(set_clause_parts)
-        params = adapt_sequence(self.engine, tuple(data[column] for column in update_columns)) + (data[identifier],)
+        params = ParamAdapter(self.engine).sequence(tuple(data[column] for column in update_columns)) + (data[identifier],)
         query = f'UPDATE {formatted_table} SET {set_clause} WHERE {formatted_identifier} = %s'
         return query, params
 
@@ -188,7 +188,7 @@ class SQLAdapter(BaseAdapter):
         if not data:
             raise ValueError('no data supplied for insert operation')
         columns = list(data.keys())
-        values = adapt_sequence(self.engine, tuple(data[column] for column in columns))
+        values = ParamAdapter(self.engine).sequence(tuple(data[column] for column in columns))
         return data, columns, values
 
     def __get_data(self, **kwargs: Any) -> JSONDict | list[JSONDict] | None:

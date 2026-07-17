@@ -3,12 +3,15 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from .params import adapt_sequence
+from .param_adapter import ParamAdapter
 from .types import JSONDict
 
-SAFE_IDENTIFIER = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
-POSTGRES_JSON_MERGE_FUNCTION = '''
+class UpsertBuilder:
+
+    SAFE_IDENTIFIER = re.compile(r'^[A-Za-z_]\w*$')
+
+    POSTGRES_JSON_MERGE_FUNCTION = '''
 CREATE OR REPLACE FUNCTION daplug_json_merge(existing jsonb, incoming jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -43,9 +46,6 @@ BEGIN
 END;
 $daplug$;
 '''
-
-
-class UpsertBuilder:
 
     def __init__(self, engine: str, **kwargs: Any) -> None:
         self.engine: str = engine
@@ -147,10 +147,10 @@ class UpsertBuilder:
         return ', '.join(['%s'] * len(self.columns))
 
     def __insert_params(self) -> Tuple[Any, ...]:
-        return adapt_sequence(self.engine, tuple(self.data[column] for column in self.columns))
+        return ParamAdapter(self.engine).sequence(tuple(self.data[column] for column in self.columns))
 
     def __format(self, value: str) -> str:
-        if not isinstance(value, str) or not SAFE_IDENTIFIER.match(value):
+        if not isinstance(value, str) or not self.SAFE_IDENTIFIER.match(value):
             raise ValueError(f'invalid identifier: {value}')
         if self.engine == 'mysql':
             return f'`{value}`'

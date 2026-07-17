@@ -3,7 +3,7 @@ import json
 import pytest
 from psycopg2.extras import Json
 
-from daplug_sql.params import adapt_sequence, adapt_value
+from daplug_sql.param_adapter import ParamAdapter
 from daplug_sql.upsert_builder import UpsertBuilder
 
 
@@ -75,17 +75,22 @@ def test_mysql_identifier_only_payload_is_noop_on_conflict():
 
 
 def test_build_validations():
+    empty_data = UpsertBuilder('postgres', **build_kwargs(data={}))
     with pytest.raises(ValueError):
-        UpsertBuilder('postgres', **build_kwargs(data={})).build()
+        empty_data.build()
+    missing_identifier = UpsertBuilder('postgres', **build_kwargs(data={'payload': {}}))
     with pytest.raises(KeyError):
-        UpsertBuilder('postgres', **build_kwargs(data={'payload': {}})).build()
+        missing_identifier.build()
+    unsafe_table = UpsertBuilder('postgres', **build_kwargs(table='bad table'))
     with pytest.raises(ValueError):
-        UpsertBuilder('postgres', **build_kwargs(table='bad table')).build()
+        unsafe_table.build()
 
 
-def test_adapt_value_by_engine():
-    assert adapt_value('postgres', 5) == 5
-    assert isinstance(adapt_value('postgres', {'a': 1}), Json)
-    assert isinstance(adapt_value('postgres', [1, 2]), Json)
-    assert adapt_value('mysql', {'a': 1}) == '{"a": 1}'
-    assert adapt_sequence('mysql', ('x', [1])) == ('x', '[1]')
+def test_param_adapter_by_engine():
+    postgres = ParamAdapter('postgres')
+    assert postgres.value(5) == 5
+    assert isinstance(postgres.value({'a': 1}), Json)
+    assert isinstance(postgres.value([1, 2]), Json)
+    mysql = ParamAdapter('mysql')
+    assert mysql.value({'a': 1}) == '{"a": 1}'
+    assert mysql.sequence(('x', [1])) == ('x', '[1]')

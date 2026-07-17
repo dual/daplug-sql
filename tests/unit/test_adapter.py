@@ -7,6 +7,7 @@ from daplug_core import dict_merger
 import daplug_sql
 import daplug_sql.sql_connection as sc
 from daplug_sql.adapter import SQLAdapter
+from daplug_sql.exception import CreateTableException, SQLAdapterException
 
 
 @pytest.fixture(autouse=True)
@@ -94,7 +95,7 @@ def test_insert_forwards_publish_data_kwarg(adapter, publish_mock, monkeypatch):
 def test_insert_raises_on_duplicate(adapter, monkeypatch):
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: {'id': 1})
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_data_params', lambda self, **_: ({'id': 1}, ['id'], (1,)))
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SQLAdapterException) as exc:
         adapter.insert(table='items', identifier='id', data={'id': 1})
     assert 'row already exist' in str(exc.value)
 
@@ -123,7 +124,7 @@ def test_update_merge_false_skips_dict_merger(adapter, publish_mock, monkeypatch
 
 def test_update_raises_when_missing(adapter, monkeypatch):
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: False)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SQLAdapterException) as exc:
         adapter.update(table='items', identifier='id', data={'id': 1})
     assert 'does not exist' in str(exc.value)
 
@@ -172,7 +173,7 @@ def test_upsert_atomic_mysql_refetches_written_row(adapter, publish_mock):
 
 
 def test_create_table_validates_and_executes(adapter):
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(CreateTableException) as exc:
         adapter.create_table(query='DROP TABLE items')
     assert 'create table' in str(exc.value)
     adapter.create_table(query='CREATE TABLE things (id TEXT PRIMARY KEY)')
@@ -201,9 +202,9 @@ def test_get_returns_row(adapter):
 
 
 def test_query_validation(adapter):
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter.query(query='select 1')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter.query(query='delete * from x', params={})
 
 
@@ -261,7 +262,7 @@ def test_get_data_handles_all_and_single(adapter):
 
 def test_execute_handles_errors(adapter):
     adapter.cursor.execute.side_effect = RuntimeError('fail')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__execute('SELECT 1', None, rollback=True)
     adapter.connection.rollback.assert_called_once()
 
@@ -278,17 +279,17 @@ def test_build_placeholders_and_format_identifier(adapter):
 
 
 def test_raise_error_paths(adapter):
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('PARAMS_REQUIRED')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('READ_ONLY')
-    with pytest.raises(Exception):
+    with pytest.raises(CreateTableException):
         adapter._SQLAdapter__raise_error('TABLE_WRITE_ONLY')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('NOT_UNIQUE', identifier='id', data={'id': 1})
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('NOT_EXISTS', identifier='id', data={'id': 1})
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('UNKNOWN')
 
 
