@@ -87,15 +87,17 @@ rows = sql.query(
 
 ## 5. Update vs Upsert
 
-- `update` merges the existing row with the payload using `dict_merger`. It raises `NOT_EXISTS` when the identifier is missing.
-- `upsert` calls `update` if the row exists; otherwise it falls back to `insert`.
+- `update` merges the existing row with the payload using `dict_merger` (pass `merge=False` to write the payload exactly as given). It raises `NOT_EXISTS` when the identifier is missing.
+- `upsert` is atomic by default: one `INSERT ... ON CONFLICT DO UPDATE` (Postgres) or `INSERT ... ON DUPLICATE KEY UPDATE` (MySQL). Pass `atomic=False` for the legacy fetch-then-insert/update path.
 
 ```python
 sql.update(data={"customer_id": "abc123", "status": "vip"}, table="customers", identifier="customer_id")
 sql.upsert(data={"customer_id": "new", "status": "trial"}, table="customers", identifier="customer_id")
 ```
 
-Both methods publish SNS events with the updated payload.
+Atomic upsert extras (all optional): `merge_columns=["payload"]` deep-merges JSON columns instead of overwriting (`install_json_merge()` once per Postgres database), `strip_paths={"payload": ["stale.key"]}` prunes keys after the merge, and `guard_column="last_event_at"` skips out-of-order rows, returning `None` instead of the written row.
+
+Both methods publish SNS events with the written payload; a guard-rejected upsert publishes nothing.
 
 ---
 
@@ -109,12 +111,14 @@ sql.delete("abc123", table="customers", identifier="customer_id")
 
 ---
 
-## 7. Create Indexes Safely
+## 7. Create Indexes and Tables Safely
 
 `create_index(table_name, index_columns)` builds an index using sanitized identifiers.
+`create_table(query=...)` executes DDL that must start with `CREATE TABLE`; anything else raises `CreateTableException`.
 
 ```python
 sql.create_index("customers", ["status", "created_at"])
+sql.create_table(query="CREATE TABLE IF NOT EXISTS customers (customer_id VARCHAR(64) PRIMARY KEY, payload JSONB)")
 ```
 
 If an invalid identifier is supplied (e.g., contains spaces or starts with a digit), the adapter raises `ValueError` before executing SQL.

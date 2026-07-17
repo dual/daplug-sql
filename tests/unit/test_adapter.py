@@ -2,8 +2,12 @@ from unittest import mock
 
 import pytest
 
+from daplug_core import dict_merger
+
+import daplug_sql
 import daplug_sql.sql_connection as sc
 from daplug_sql.adapter import SQLAdapter
+from daplug_sql.exception import CreateTableException, SQLAdapterException
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +95,7 @@ def test_insert_forwards_publish_data_kwarg(adapter, publish_mock, monkeypatch):
 def test_insert_raises_on_duplicate(adapter, monkeypatch):
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: {'id': 1})
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_data_params', lambda self, **_: ({'id': 1}, ['id'], (1,)))
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SQLAdapterException) as exc:
         adapter.insert(table='items', identifier='id', data={'id': 1})
     assert 'row already exist' in str(exc.value)
 
@@ -102,28 +106,93 @@ def test_update_merges_and_executes(adapter, publish_mock, monkeypatch):
     def fake_merge(existing, new, **kwargs):
         return {'id': 1, 'name': new['name']}
 
-    monkeypatch.setattr('daplug_sql.adapter.dict_merger.merge', fake_merge)
+    monkeypatch.setattr(dict_merger, 'merge', fake_merge)
     adapter.update(table='items', identifier='id', data={'id': 1, 'name': 'new'})
     adapter.cursor.execute.assert_called()
     publish_mock.assert_called()
 
 
+def test_update_merge_false_skips_dict_merger(adapter, publish_mock, monkeypatch):
+    monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: {'id': 1, 'name': 'old', 'stale': True})
+    merge_spy = mock.MagicMock()
+    monkeypatch.setattr(dict_merger, 'merge', merge_spy)
+    result = adapter.update(table='items', identifier='id', data={'id': 1, 'name': 'new'}, merge=False)
+    merge_spy.assert_not_called()
+    assert result == {'id': 1, 'name': 'new'}
+    publish_mock.assert_called_once()
+
+
 def test_update_raises_when_missing(adapter, monkeypatch):
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: False)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(SQLAdapterException) as exc:
         adapter.update(table='items', identifier='id', data={'id': 1})
     assert 'does not exist' in str(exc.value)
 
 
-def test_upsert_paths(adapter, monkeypatch):
+def test_upsert_legacy_paths(adapter, monkeypatch):
     updater = mock.MagicMock(return_value='updated')
     inserter = mock.MagicMock(return_value='inserted')
     monkeypatch.setattr(SQLAdapter, 'update', updater)
     monkeypatch.setattr(SQLAdapter, 'insert', inserter)
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: True)
-    assert adapter.upsert(table='items', identifier='id', data={'id': 1}) == 'updated'
+    assert adapter.upsert(table='items', identifier='id', data={'id': 1}, atomic=False) == 'updated'
     monkeypatch.setattr(SQLAdapter, '_SQLAdapter__get_existing', lambda self, **_: False)
-    assert adapter.upsert(table='items', identifier='id', data={'id': 1}) == 'inserted'
+    assert adapter.upsert(table='items', identifier='id', data={'id': 1}, atomic=False) == 'inserted'
+
+
+def test_upsert_atomic_is_default_and_publishes_written_row(adapter, publish_mock):
+    adapter.cursor.rowcount = 1
+    adapter.cursor.fetchone.return_value = {'id': 1, 'name': 'merged'}
+    result = adapter.upsert(table='items', identifier='id', data={'id': 1, 'name': 'new'})
+    query = adapter.cursor.execute.call_args.args[0]
+    assert 'ON CONFLICT ("id") DO UPDATE SET' in query
+    assert query.endswith('RETURNING *')
+    assert result == {'id': 1, 'name': 'merged'}
+    publish_mock.assert_called_once()
+    assert publish_mock.call_args.args[0] == {'id': 1, 'name': 'merged'}
+
+
+def test_upsert_atomic_guard_rejection_returns_none(adapter, publish_mock):
+    adapter.cursor.rowcount = 0
+    result = adapter.upsert(table='items', identifier='id', data={'id': 1, 'name': 'old'}, guard_column='updated_at')
+    query = adapter.cursor.execute.call_args.args[0]
+    assert 'WHERE existing."updated_at" IS NULL OR EXCLUDED."updated_at" >= existing."updated_at"' in query
+    assert result is None
+    publish_mock.assert_not_called()
+
+
+def test_upsert_atomic_mysql_refetches_written_row(adapter, publish_mock):
+    adapter.engine = 'mysql'
+    adapter.cursor.rowcount = 2
+    adapter.cursor.fetchone.return_value = {'id': 1, 'name': 'stored'}
+    result = adapter.upsert(table='items', identifier='id', data={'id': 1, 'name': 'new'})
+    query = adapter.cursor.execute.call_args_list[0].args[0]
+    assert 'ON DUPLICATE KEY UPDATE' in query
+    assert result == {'id': 1, 'name': 'stored'}
+    publish_mock.assert_called_once()
+
+
+def test_create_table_validates_and_executes(adapter):
+    with pytest.raises(CreateTableException) as exc:
+        adapter.create_table(query='DROP TABLE items')
+    assert 'create table' in str(exc.value)
+    adapter.create_table(query='CREATE TABLE things (id TEXT PRIMARY KEY)')
+    adapter.cursor.execute.assert_called_once_with('CREATE TABLE things (id TEXT PRIMARY KEY)')
+
+
+def test_install_json_merge_by_engine(adapter):
+    adapter.install_json_merge()
+    query = adapter.cursor.execute.call_args.args[0]
+    assert 'CREATE OR REPLACE FUNCTION daplug_json_merge' in query
+    adapter.cursor.execute.reset_mock()
+    adapter.engine = 'mysql'
+    adapter.install_json_merge()
+    adapter.cursor.execute.assert_not_called()
+
+
+def test_factory_returns_adapter():
+    instance = daplug_sql.adapter(endpoint='db.local', database='app', user='svc', password='pw')
+    assert isinstance(instance, SQLAdapter)
 
 
 def test_get_returns_row(adapter):
@@ -133,9 +202,9 @@ def test_get_returns_row(adapter):
 
 
 def test_query_validation(adapter):
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter.query(query='select 1')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter.query(query='delete * from x', params={})
 
 
@@ -193,7 +262,7 @@ def test_get_data_handles_all_and_single(adapter):
 
 def test_execute_handles_errors(adapter):
     adapter.cursor.execute.side_effect = RuntimeError('fail')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__execute('SELECT 1', None, rollback=True)
     adapter.connection.rollback.assert_called_once()
 
@@ -210,17 +279,17 @@ def test_build_placeholders_and_format_identifier(adapter):
 
 
 def test_raise_error_paths(adapter):
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('PARAMS_REQUIRED')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('READ_ONLY')
-    with pytest.raises(Exception):
+    with pytest.raises(CreateTableException):
         adapter._SQLAdapter__raise_error('TABLE_WRITE_ONLY')
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('NOT_UNIQUE', identifier='id', data={'id': 1})
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('NOT_EXISTS', identifier='id', data={'id': 1})
-    with pytest.raises(Exception):
+    with pytest.raises(SQLAdapterException):
         adapter._SQLAdapter__raise_error('UNKNOWN')
 
 

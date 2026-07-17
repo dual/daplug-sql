@@ -31,6 +31,32 @@ def reset_items_table():
     conn.close()
 
 
+def reset_documents_table():
+    conn = connection()
+    cur = conn.cursor()
+    cur.execute('DROP TABLE IF EXISTS documents')
+    cur.execute(
+        'CREATE TABLE documents ('
+        ' entity_key VARCHAR(64) PRIMARY KEY,'
+        ' payload JSON,'
+        ' last_event_at BIGINT'
+        ') ENGINE=InnoDB'
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def fetch_document(entity_key):
+    conn = connection()
+    cur = conn.cursor()
+    cur.execute('SELECT payload, last_event_at FROM documents WHERE entity_key = %s', (entity_key,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row
+
+
 def insert_item(external_id, name, value):
     conn = connection()
     cur = conn.cursor()
