@@ -8,8 +8,10 @@ from daplug_core.base_adapter import BaseAdapter  # type: ignore[import-untyped]
 from daplug_core.logger import logger  # type: ignore[import-untyped]
 
 from .exception import CreateTableException, SQLAdapterException
+from .params import adapt_sequence
 from .sql_connection import sql_connection, sql_connection_cleanup
 from .types import ConnectionProtocol, CursorProtocol, JSONDict
+from .upsert_builder import POSTGRES_JSON_MERGE_FUNCTION, UpsertBuilder
 
 if TYPE_CHECKING:
     from .sql_connector import SQLConnector
@@ -89,7 +91,8 @@ class SQLAdapter(BaseAdapter):
         exists = self.__get_existing(**kwargs)
         if not exists:
             self.__raise_error('NOT_EXISTS', **kwargs)
-        kwargs['data'] = dict_merger.merge(exists, kwargs['data'], **kwargs)
+        if kwargs.get('merge', True):
+            kwargs['data'] = dict_merger.merge(exists, kwargs['data'], **kwargs)
         query, params = self.__create_update_query(
             kwargs['data'], kwargs['table'], kwargs['identifier']
         )
@@ -97,11 +100,24 @@ class SQLAdapter(BaseAdapter):
         super().publish(kwargs['data'], **kwargs)
         return kwargs['data']
 
-    def upsert(self, **kwargs: Any) -> JSONDict:
+    def upsert(self, **kwargs: Any) -> Optional[JSONDict]:
+        if kwargs.get('atomic', True):
+            return self.__upsert_atomic(**kwargs)
         exists = self.__get_existing(**kwargs)
         if exists:
             return self.update(**kwargs)
         return self.insert(**kwargs)
+
+    def create_table(self, **kwargs: Any) -> None:
+        query = str(kwargs.pop('query', ''))
+        if not query.strip().lower().startswith('create table'):
+            self.__raise_error('TABLE_WRITE_ONLY', **kwargs)
+        self.__execute(query, None, **kwargs)
+
+    def install_json_merge(self, **kwargs: Any) -> None:
+        if self.engine == 'mysql':
+            return
+        self.__execute(POSTGRES_JSON_MERGE_FUNCTION, None, **kwargs)
 
     def delete(self, identifier_value: Any, **kwargs: Any) -> None:
         table = self.__format_identifier(kwargs['table'])
@@ -117,6 +133,24 @@ class SQLAdapter(BaseAdapter):
         statement = f'CREATE INDEX {index_name} ON {table} ({", ".join(formatted_columns)})'
         self.__execute(query=statement, params=None)
 
+    def __upsert_atomic(self, **kwargs: Any) -> Optional[JSONDict]:
+        builder = UpsertBuilder(self.engine, **kwargs)
+        query, params = builder.build()
+        self.__execute(query, params, **kwargs)
+        row = self.__upsert_written_row(**kwargs)
+        if row is None:
+            return None
+        super().publish(row, **kwargs)
+        return row
+
+    def __upsert_written_row(self, **kwargs: Any) -> Optional[JSONDict]:
+        if self.cursor and self.cursor.rowcount == 0:
+            return None
+        if self.engine == 'mysql':
+            return self.get(kwargs['data'][kwargs['identifier']], **kwargs)
+        row = self.__get_data()
+        return row if isinstance(row, dict) else None
+
     def __create_update_query(self, data: JSONDict, table: str, identifier: str) -> Tuple[str, Tuple[Any, ...]]:
         if identifier not in data:
             raise KeyError(f'identifier "{identifier}" missing from payload for update')
@@ -130,7 +164,7 @@ class SQLAdapter(BaseAdapter):
             formatted_column = self.__format_identifier(column)
             set_clause_parts.append(f'{formatted_column} = %s')
         set_clause = ', '.join(set_clause_parts)
-        params = tuple(data[column] for column in update_columns) + (data[identifier],)
+        params = adapt_sequence(self.engine, tuple(data[column] for column in update_columns)) + (data[identifier],)
         query = f'UPDATE {formatted_table} SET {set_clause} WHERE {formatted_identifier} = %s'
         return query, params
 
@@ -154,7 +188,7 @@ class SQLAdapter(BaseAdapter):
         if not data:
             raise ValueError('no data supplied for insert operation')
         columns = list(data.keys())
-        values = tuple(data[column] for column in columns)
+        values = adapt_sequence(self.engine, tuple(data[column] for column in columns))
         return data, columns, values
 
     def __get_data(self, **kwargs: Any) -> JSONDict | list[JSONDict] | None:

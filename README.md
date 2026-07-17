@@ -21,6 +21,8 @@
 
 - **Single adapter factory** – `daplug_sql.adapter(**kwargs)` returns a ready-to-go adapter configured for Postgres or MySQL based on the `engine` parameter.
 - **Optimistic CRUD** – Identifier-aware `insert`, `update`, `upsert`, and `delete` guard against duplicates and emit SNS events automatically.
+- **Atomic upserts** – `upsert` compiles to a single `INSERT ... ON CONFLICT DO UPDATE` (Postgres) or `INSERT ... ON DUPLICATE KEY UPDATE` (MySQL), safe under concurrent writers, with optional JSON deep-merge, key stripping, and an out-of-order guard column.
+- **JSON native** – dict/list values are adapted automatically (`psycopg2 Json` on Postgres, `json.dumps` on MySQL), so JSONB/JSON columns just work.
 - **Connection reuse** – Thread-safe cache reuses connections per endpoint/database/user/port/engine and lazily closes them.
 - **Integration-tested** – `pipenv run integration` spins up both Postgres and MySQL via docker-compose and runs the real test suite.
 
@@ -91,6 +93,11 @@ Every CRUD/query helper expects the target table and identifier column at call t
 | `fifo_group_id` / `fifo_duplication_id` | Optional FIFO metadata passed straight to SNS. |
 | `publish` | Set to `False` to skip the SNS publish for this call only (default `True`). |
 | `publish_data` | Replace the published payload entirely (the row write is unchanged). |
+| `merge` | `update` only: set `False` to skip the read-and-merge and write the payload exactly as given (default `True`). |
+| `atomic` | `upsert` only: set `False` to fall back to the legacy fetch-then-insert/update path (default `True`). |
+| `merge_columns` | `upsert` only: list of JSON columns to deep-merge with the existing row instead of overwriting. |
+| `strip_paths` | `upsert` only: `{column: [dot.paths]}` removed from the column after merge (e.g. prune stale keys). |
+| `guard_column` | `upsert` only: column compared as `incoming >= existing`; stale rows are skipped and `upsert` returns `None`. |
 
 ### SNS Publishing
 
@@ -151,13 +158,15 @@ sql.update(
 | `close()`                                           | Closes the cursor/connection and evicts the cached connector.                                       |
 | `commit(commit=True)`                               | Commits the underlying DB connection when `commit` is truthy.                                      |
 | `insert(data, table, identifier, **kwargs)`         | Validates data, enforces uniqueness on the provided identifier, inserts the row, and publishes SNS. |
-| `update(data, table, identifier, **kwargs)`         | Fetches the existing row, merges via `dict_merger`, runs `UPDATE`, publishes SNS.                   |
-| `upsert(data, table, identifier, **kwargs)`         | Calls `update` when the row exists; falls back to `insert`.                                        |
+| `update(data, table, identifier, **kwargs)`         | Fetches the existing row, merges via `dict_merger` (skip with `merge=False`), runs `UPDATE`, publishes SNS. |
+| `upsert(data, table, identifier, **kwargs)`         | Single atomic `ON CONFLICT`/`ON DUPLICATE KEY` write (default); supports `merge_columns`, `strip_paths`, `guard_column`. Returns the written row, or `None` when the guard rejects it. `atomic=False` restores the legacy fetch-then-write path. |
 | `get(identifier_value, table, identifier, **kwargs)`| Returns the first matching row or `None`.                                                         |
 | `read(identifier_value, table, identifier, **kwargs)`| Alias of `get`.                                                                                   |
 | `query(query, params, table, identifier, **kwargs)` | Executes a read-only statement (SELECT) and returns all rows as dictionaries.                       |
 | `delete(identifier_value, table, identifier, **kwargs)` | Deletes the row, publishes SNS, and ignores missing rows.                                     |
 | `create_index(table_name, index_columns)`           | Issues `CREATE INDEX index_col1_col2 ON table_name (col1, col2)` using safe identifiers.            |
+| `create_table(query, **kwargs)`                     | Executes DDL that must start with `CREATE TABLE`; anything else raises `CreateTableException`.      |
+| `install_json_merge(**kwargs)`                      | Postgres only: installs the `daplug_json_merge` deep-merge function used by `merge_columns` (no-op on MySQL, which uses native `JSON_MERGE_PATCH`). Run once per database, e.g. in migrations. |
 
 > All identifier-based helpers sanitize names with `SAFE_IDENTIFIER` to prevent SQL injection through table/column inputs.
 
@@ -216,6 +225,37 @@ finally:
 sql.insert(data=payload, table="orders", identifier="order_id")
 sql.create_index("orders", ["status", "created_at"])
 ```
+
+### Atomic Upserts with JSON Merge (event projections)
+
+Project events into one row per entity: merge payloads additively, prune stale keys, and skip
+out-of-order deliveries, all in a single atomic statement.
+
+```python
+sql.create_table(
+    query="CREATE TABLE IF NOT EXISTS business_workers ("
+          " entity_key VARCHAR(64) PRIMARY KEY,"
+          " payload JSONB,"
+          " last_event_at BIGINT)"
+)
+sql.install_json_merge()  # once per Postgres database; MySQL uses native JSON_MERGE_PATCH
+
+row = sql.upsert(
+    data={"entity_key": "worker-123", "payload": event_payload, "last_event_at": occurred_at},
+    table="business_workers",
+    identifier="entity_key",
+    merge_columns=["payload"],                       # deep-merge instead of overwrite
+    strip_paths={"payload": ["eye_color", "preferences.music"]},  # prune stale keys
+    guard_column="last_event_at",                    # ignore older events
+)
+if row is None:
+    print("stale event skipped")
+```
+
+Engine notes: the row is returned via `RETURNING *` on Postgres and re-fetched on MySQL (JSON
+columns come back as strings there). MySQL deep-merge follows `JSON_MERGE_PATCH` semantics, so a
+JSON `null` removes its key; Postgres keeps it. The atomic path requires the identifier column to
+be the primary key or a unique index, and MySQL 8.0.19+ for the row-alias syntax.
 
 ---
 

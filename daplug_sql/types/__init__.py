@@ -10,6 +10,8 @@ StrIterable = Iterable[str]
 
 @runtime_checkable
 class CursorProtocol(Protocol):
+    rowcount: int
+
     def execute(self, query: str, params: Sequence[Any] | None = ...) -> Any: ...
 
     def fetchone(self) -> JSONDict | None: ...
