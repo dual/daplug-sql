@@ -3,9 +3,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple
 
-from daplug_core import dict_merger  # type: ignore[import-untyped]
+from daplug_core import dict_merger, logger  # type: ignore[import-untyped]
 from daplug_core.base_adapter import BaseAdapter  # type: ignore[import-untyped]
-from daplug_core.logger import logger  # type: ignore[import-untyped]
 
 from .exception import CreateTableException, SQLAdapterException
 from .param_adapter import ParamAdapter
